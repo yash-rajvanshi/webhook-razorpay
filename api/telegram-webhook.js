@@ -2,10 +2,10 @@ const bot = require('./_lib/bot');
 const razorpay = require('./_lib/razorpay');
 const config = require('./_lib/config');
 
-bot.start(async (ctx) => {
+bot.command('buy', async (ctx) => {
   const username = ctx.from.username || ctx.from.first_name || 'User';
 
-  await ctx.reply(`Hello ${username}! Welcome to Premium Access.\n\nClick the button below to buy premium for ₹99`, {
+  await ctx.reply(`Hello ${username}! Welcome to Premium Access.\n\nClick the button below to join the HMT Stock Alert Pro Max channel for ₹99`, {
     reply_markup: {
       inline_keyboard: [
         [{ text: "Buy Premium", callback_data: "buy_premium" }]
