@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const configLib = require('./_lib/config');
 const bot = require('./_lib/bot');
 const Razorpay = require('razorpay');
+const { getDb } = require('./_lib/db');
 
 const getRawBody = (req) => {
   return new Promise((resolve, reject) => {
@@ -50,10 +51,48 @@ const handler = async (req, res) => {
             expire_date: Math.floor(Date.now() / 1000) + (60 * 60 * 24),
           });
 
-          await bot.telegram.sendMessage(
-            telegramId, 
-            `🎉 Payment Successful! Thanks for subscribing.\n\nHere is your single-use invite link to the Premium Channel:\n\n${inviteLink.invite_link}\n\nPlease join within 24 hours.`
+          const db = await getDb();
+          const usersColl = db.collection('users');
+          const now = new Date();
+          
+          const existingUser = await usersColl.findOne({ telegram_id: telegramId.toString() });
+          
+          let newExpiry;
+          let isExtension = false;
+          
+          if (existingUser && existingUser.expiresAt && existingUser.expiresAt > now) {
+            // Extend from current expiry
+            newExpiry = new Date(existingUser.expiresAt.getTime() + (30 * 24 * 60 * 60 * 1000));
+            isExtension = true;
+          } else {
+            // Start 30 days from now
+            newExpiry = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
+          }
+          
+          await usersColl.updateOne(
+            { telegram_id: telegramId.toString() },
+            { 
+              $set: { 
+                telegram_id: telegramId.toString(),
+                username: notes.username || "",
+                first_name: notes.first_name || "",
+                status: "active",
+                lastPaymentDate: now,
+                expiresAt: newExpiry,
+                lastPaymentId: paymentLink.id
+              } 
+            },
+            { upsert: true }
           );
+
+          let successMessage = `🎉 Payment Successful! Thanks for subscribing.`;
+          if (isExtension) {
+            successMessage = `🎉 Payment Successful! Your subscription has been extended to ${newExpiry.toDateString()}.`;
+          }
+          
+          successMessage += `\n\nHere is your single-use invite link to the Premium Channel:\n\n${inviteLink.invite_link}\n\nPlease join within 24 hours.`;
+
+          await bot.telegram.sendMessage(telegramId, successMessage);
 
         } catch (botError) {
           console.error("Failed to generate or send invite link:", botError);

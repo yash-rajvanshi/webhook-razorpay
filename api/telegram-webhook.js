@@ -36,7 +36,9 @@ bot.action('buy_premium', async (ctx) => {
       },
       reminder_enable: false,
       notes: {
-        telegram_id: telegram_id.toString()
+        telegram_id: telegram_id.toString(),
+        username: ctx.from.username || "",
+        first_name: ctx.from.first_name || ""
       }
     });
 
