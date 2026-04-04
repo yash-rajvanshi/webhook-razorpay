@@ -5,7 +5,7 @@ const config = require('./_lib/config');
 bot.start(async (ctx) => {
   const username = ctx.from.username || ctx.from.first_name || 'User';
 
-  await ctx.reply(`Hello ${username}! Welcome to Premium Access.\n\nClick the button below to buy premium for 500 INR.`, {
+  await ctx.reply(`Hello ${username}! Welcome to Premium Access.\n\nClick the button below to buy premium for ₹99`, {
     reply_markup: {
       inline_keyboard: [
         [{ text: "Buy Premium", callback_data: "buy_premium" }]
@@ -23,7 +23,7 @@ bot.action('buy_premium', async (ctx) => {
     await ctx.reply('Generating your secure payment link...');
 
     const paymentLink = await razorpay.paymentLink.create({
-      amount: 500 * 100, // Amount in paise (500 INR)
+      amount: 99 * 100, // Amount in paise (99 INR)
       currency: "INR",
       accept_partial: false,
       description: "Premium Telegram Channel Access",
@@ -42,7 +42,7 @@ bot.action('buy_premium', async (ctx) => {
       }
     });
 
-    await ctx.reply(`Here is your payment link. Once paid, you will automatically receive an invite link here.\n\n${paymentLink.short_url}`);
+    await ctx.reply(`Here is your payment link. Once paid, you will automatically receive an invite link to join the HMT Stock Alert Pro Max channel here.\n\n${paymentLink.short_url}`);
   } catch (error) {
     console.error("Error creating payment link:", error);
     await ctx.reply("Sorry, there was an issue generating your payment link. Please try again later.");
