@@ -1,0 +1,78 @@
+const crypto = require('crypto');
+const configLib = require('./_lib/config');
+const bot = require('./_lib/bot');
+const Razorpay = require('razorpay');
+
+const getRawBody = (req) => {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+    req.on('end', () => resolve(body));
+    req.on('error', reject);
+  });
+};
+
+const handler = async (req, res) => {
+  if (req.method !== 'POST') {
+    return res.status(405).send('Method Not Allowed');
+  }
+
+  try {
+    const rawBody = await getRawBody(req);
+    const signature = req.headers['x-razorpay-signature'];
+    
+    // Validate signature via Razorpay helper
+    try {
+      const isValid = Razorpay.validateWebhookSignature(rawBody, signature, configLib.RAZORPAY_WEBHOOK_SECRET);
+      if (!isValid) {
+         return res.status(400).send('Invalid Signature');
+      }
+    } catch (err) {
+       console.error("Signature verification error:", err);
+       return res.status(400).send('Signature Verification Failed');
+    }
+
+    const event = JSON.parse(rawBody);
+
+    if (event.event === 'payment_link.paid') {
+      const paymentLink = event.payload.payment_link.entity;
+      const notes = paymentLink.notes;
+
+      if (notes && notes.telegram_id) {
+        const telegramId = notes.telegram_id;
+
+        try {
+          // Generate a single-use invite link valid for 24 hours
+          const inviteLink = await bot.telegram.createChatInviteLink(configLib.TELEGRAM_CHANNEL_ID, {
+            member_limit: 1, 
+            expire_date: Math.floor(Date.now() / 1000) + (60 * 60 * 24),
+          });
+
+          await bot.telegram.sendMessage(
+            telegramId, 
+            `🎉 Payment Successful! Thanks for subscribing.\n\nHere is your single-use invite link to the Premium Channel:\n\n${inviteLink.invite_link}\n\nPlease join within 24 hours.`
+          );
+
+        } catch (botError) {
+          console.error("Failed to generate or send invite link:", botError);
+        }
+      } else {
+        console.warn('No telegram_id found in notes', notes);
+      }
+    }
+
+    res.status(200).json({ status: 'ok' });
+  } catch (error) {
+    console.error("Webhook processing error:", error);
+    res.status(500).send('Internal Server Error');
+  }
+};
+
+module.exports = handler;
+module.exports.config = {
+  api: {
+    bodyParser: false,
+  },
+};
