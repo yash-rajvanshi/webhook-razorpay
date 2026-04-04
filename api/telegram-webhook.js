@@ -50,10 +50,14 @@ bot.action('buy_premium', async (ctx) => {
 module.exports = async (req, res) => {
   if (req.method === 'POST') {
     try {
-      await bot.handleUpdate(req.body, res);
+      // Process the Telegram update
+      await bot.handleUpdate(req.body);
+      // Let Vercel know request succeeded
+      return res.status(200).send('OK');
     } catch (e) {
       console.error(e);
-      res.status(500).send('Something went wrong');
+      // It's recommended to return 200 to Telegram even on errors so they don't get stuck retrying the same bad webhook
+      return res.status(200).send('OK');
     }
   } else {
     // Allow setting the webhook via a GET request with query parameter
