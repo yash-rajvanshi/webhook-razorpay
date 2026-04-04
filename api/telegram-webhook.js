@@ -50,8 +50,14 @@ bot.action('buy_premium', async (ctx) => {
 module.exports = async (req, res) => {
   if (req.method === 'POST') {
     try {
+      console.log('📬 INCOMING TELEGRAM WEBHOOK:', req.body);
+      
       // Process the Telegram update
       await bot.handleUpdate(req.body);
+      
+      console.log('✅ WEBHOOK PROCESSED SUCCESSFULLY');
+      // Let Vercel know request succeeded
+      return res.status(200).send('OK');
       // Let Vercel know request succeeded
       return res.status(200).send('OK');
     } catch (e) {
