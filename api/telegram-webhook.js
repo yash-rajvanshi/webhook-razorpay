@@ -2,10 +2,22 @@ const bot = require('./_lib/bot');
 const razorpay = require('./_lib/razorpay');
 const config = require('./_lib/config');
 
+bot.start(async (ctx) => {
+  const welcomeText = `⭐ If you want to get stock alerts for highly demanding watches i.e. "Kohinoor", "Himalaya", "Tareeq", "Sangam", and "Vijay", buy our Premium subscription at just ₹99!\n\n🔔Free Stock alerts are posted in this Channel:\nhttps://t.me/+qyxExKKw9oZhZmM1\nThis is the broadcasting channel where we share stock updates from hmtwatches.in and hmtwatches.store.\n\n💬 Want to chat with other HMT fans?\nJoin our community group:\nhttps://t.me/+n18fg9lCz344NjJl\n\nIt's our HMT Enjoyers Group where we discuss watches, share purchases, and help each other out. 😄`;
+
+  await ctx.reply(welcomeText, {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "Buy Premium (₹99)", callback_data: "buy_premium" }]
+      ]
+    }
+  });
+});
+
 bot.command('buy', async (ctx) => {
   const username = ctx.from.username || ctx.from.first_name || 'User';
 
-  await ctx.reply(`Hello ${username}! Welcome to Premium Access.\n\nClick the button below to join the HMT Stock Alert Pro Max channel for ₹99`, {
+  await ctx.reply(`Hello ${username}!\n\nClick the button below to join the HMT Stock Alert Pro Max channel for ₹99`, {
     reply_markup: {
       inline_keyboard: [
         [{ text: "Buy Premium", callback_data: "buy_premium" }]
