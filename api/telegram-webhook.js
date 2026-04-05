@@ -4,7 +4,7 @@ const config = require('./_lib/config');
 const { getDb } = require('./_lib/db');
 
 bot.start(async (ctx) => {
-  const welcomeText = `⭐ If you want to get stock alerts for highly demanding watches i.e. "Kohinoor", "Himalaya", "Tareeq", "Sangam", and "Vijay", buy our Premium subscription at just ₹99!\n\n🔔Free Stock alerts are posted in this Channel:\nhttps://t.me/+qyxExKKw9oZhZmM1\nThis is the broadcasting channel where we share stock updates from hmtwatches.in and hmtwatches.store.\n\n💬 Want to chat with other HMT fans?\nJoin our community group:\nhttps://t.me/+n18fg9lCz344NjJl\n\nIt's our HMT Enjoyers Group where we discuss watches, share purchases, and help each other out. 😄`;
+  const welcomeText = `⭐ If you want to get stock alerts for highly demanding watches i.e. "Kohinoor", "Himalaya", "Tareeq", "Sangam", and "Vijay", buy our Premium subscription at just ₹99 for 30 days!\n\n🔔Free Stock alerts are posted in this Channel:\nhttps://t.me/+qyxExKKw9oZhZmM1\nThis is the broadcasting channel where we share stock updates from hmtwatches.in and hmtwatches.store.\n\n💬 Want to chat with other HMT fans?\nJoin our community group:\nhttps://t.me/+n18fg9lCz344NjJl\n\nIt's our HMT Enjoyers Group where we discuss watches, share purchases, and help each other out. 😄`;
 
   await ctx.reply(welcomeText, {
     reply_markup: {
@@ -24,7 +24,7 @@ bot.start(async (ctx) => {
 bot.command('buy', async (ctx) => {
   const username = ctx.from.username || ctx.from.first_name || 'User';
 
-  await ctx.reply(`Hello ${username}!\n\nClick the button below to join the HMT Stock Alert Pro Max channel for ₹99`, {
+  await ctx.reply(`Hello ${username}!\n\nClick the button below to join the HMT Stock Alert Pro Max channel for ₹99/month (30 days).`, {
     reply_markup: {
       inline_keyboard: [
         [{ text: "Buy Premium", callback_data: "buy_premium" }]
@@ -61,7 +61,7 @@ bot.action('buy_premium', async (ctx) => {
       }
     });
 
-    await ctx.reply(`Here is your payment link. Once paid, you will automatically receive an invite link to join the HMT Stock Alert Pro Max channel here.\n\n${paymentLink.short_url}`);
+    await ctx.reply(`Here is your payment link for a 30-day Premium subscription. Once paid, you will automatically receive an invite link to join the HMT Stock Alert Pro Max channel here.\n\n${paymentLink.short_url}`);
   } catch (error) {
     console.error("Error creating payment link:", error);
     await ctx.reply("Sorry, there was an issue generating your payment link. Please try again later.");
@@ -92,7 +92,7 @@ bot.command('status', async (ctx) => {
 });
 
 bot.command('help', async (ctx) => {
-  const helpText = `*HMT Stock Alert Bot - Help Menu*\n\nHere are the commands you can use:\n\n/start - View community links and welcome message\n/buy - Purchase Premium Stock Alerts (₹99 for 30 days)\n/status - Check your active subscription expiry date\n/help - Show this manual\n\nIf you experience payment issues, please reach out in the Community Group!`;
+  const helpText = `*HMT Stock Alert Bot - Help Menu*\n\nHere are the commands you can use:\n\n/start - View community links and welcome message\n/buy - Purchase Premium Stock Alerts (₹99 for 30 days)\n/status - Check your active subscription expiry date\n/help - Show this manual\n\nEach subscription lasts 30 days from the date of payment. If you experience payment issues, please reach out in the Community Group!`;
   return ctx.reply(helpText, { parse_mode: 'Markdown' });
 });
 

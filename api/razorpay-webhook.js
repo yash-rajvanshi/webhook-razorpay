@@ -86,9 +86,9 @@ const handler = async (req, res) => {
             { upsert: true }
           );
 
-          let successMessage = `🎉 Payment Successful!✅ Thanks for subscribing.`;
+          let successMessage = `🎉 Payment Successful!✅ Thanks for subscribing.\n\n📅 Your 30-day Premium subscription is now active and expires on ${newExpiry.toDateString()}.`;
           if (isExtension) {
-            successMessage = `🎉 Payment Successful!✅ Your subscription has been extended to ${newExpiry.toDateString()}.`;
+            successMessage = `🎉 Payment Successful!✅ Your subscription has been extended by 30 days and is now valid until ${newExpiry.toDateString()}.`;
           }
           
           successMessage += `\n\nHere is your single-use invite link to the Premium Channel:\n\n${inviteLink.invite_link}\n\nPlease join within 24 hours.`;
