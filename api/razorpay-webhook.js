@@ -79,7 +79,8 @@ const handler = async (req, res) => {
                 status: "active",
                 lastPaymentDate: now,
                 expiresAt: newExpiry,
-                lastPaymentId: paymentLink.id
+                lastPaymentId: paymentLink.id,
+                warningSent: false // Reset so the warning can fire again on the next cycle
               } 
             },
             { upsert: true }
