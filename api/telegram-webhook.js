@@ -111,7 +111,15 @@ bot.command('help', async (ctx) => {
     `/help - Show this guide\n\n` +
     `Each subscription lasts *30 days* from the date of payment.\n` +
     `Having trouble? Reach out in the community group! 😄`;
-  return ctx.reply(helpText, { parse_mode: 'Markdown', disable_web_page_preview: true });
+  return ctx.reply(helpText, {
+    parse_mode: 'Markdown',
+    disable_web_page_preview: true,
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "Buy Premium (₹99 / 30 days)", callback_data: "buy_premium" }]
+      ]
+    }
+  });
 });
 
 module.exports = async (req, res) => {
