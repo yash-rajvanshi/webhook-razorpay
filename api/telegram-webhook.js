@@ -96,12 +96,12 @@ bot.command('help', async (ctx) => {
     `*🆓 Free Channel* — Open to everyone!\n` +
     `Join here: https://t.me/+qyxExKKw9oZhZmM1\n` +
     `• Stock alerts from hmtwatches.in & hmtwatches.store\n` +
-    `• All watch models covered\n` +
+    `• All watch models covered except *Kohinoor, Himalaya, Tareeq, Sangam & Vijay*\n` +
     `• Alerts may be delayed compared to Premium\n\n` +
-    `*⭐ Premium Channel* — ₹99 for 30 days\n` +
+    `*⭐ Premium Channel* — Only ₹99 for 30 days\n` +
     `• 🚀 *Instant alerts* the moment stock goes live\n` +
     `• 🎯 Focused alerts for high-demand watches:\n` +
-    `   Kohinoor, Himalaya, Tareeq, Sangam & Vijay\n` +
+    `   *Kohinoor, Himalaya, Tareeq, Sangam & Vijay*\n` +
     `• ⚡ Get ahead of everyone — these sell out in minutes!\n` +
     `• 💬 Priority support in the community group\n\n` +
     `*📌 Commands*\n` +
