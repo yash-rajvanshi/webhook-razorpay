@@ -55,8 +55,14 @@ MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/your-db-nam
    - Push your code to a GitHub repository and link it to Vercel. 
    - Ensure the Environment Variables are correctly set inside the Vercel Dashboard.
 
-2. **Bind Telegram to Vercel**
-   - Click this native link (replacing parts with your actual token and domain):
+2. **Bind Telegram to Vercel (Two-Step Process)**
+   
+   *Step A: Publish the Command Menu*
+   - Visit the following URL in your browser to push the `/start`, `/buy`, `/help`, and `/status` commands to the Telegram UI:
+   - `https://<YOUR-VERCEL-DOMAIN>.vercel.app/api/telegram-webhook?setWebhook=true`
+   
+   *Step B: Lock the Production Pointer (Crucial for Vercel)*
+   - To prevent Vercel's "Preview Environments" from causing 401 Unauthorized errors by locking out Telegram, you **must** manually force the webhook back to your clean production URL. Visit this in your browser:
    - `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=https://<YOUR-VERCEL-DOMAIN>.vercel.app/api/telegram-webhook`
 
 3. **Bind Razorpay to Vercel**

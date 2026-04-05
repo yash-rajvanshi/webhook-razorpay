@@ -85,14 +85,19 @@ const handler = async (req, res) => {
             { upsert: true }
           );
 
-          let successMessage = `🎉 Payment Successful! Thanks for subscribing.`;
+          let successMessage = `🎉 Payment Successful!✅ Thanks for subscribing.`;
           if (isExtension) {
-            successMessage = `🎉 Payment Successful! Your subscription has been extended to ${newExpiry.toDateString()}.`;
+            successMessage = `🎉 Payment Successful!✅ Your subscription has been extended to ${newExpiry.toDateString()}.`;
           }
           
           successMessage += `\n\nHere is your single-use invite link to the Premium Channel:\n\n${inviteLink.invite_link}\n\nPlease join within 24 hours.`;
 
           await bot.telegram.sendMessage(telegramId, successMessage);
+
+          if (configLib.ADMIN_CHAT_ID) {
+            const adminMsg = `🤑 *New Subscription Payment!*\n\n*Name:* ${notes.first_name || 'N/A'}\n*Username:* @${notes.username || 'N/A'}\n*Telegram ID:* \`${telegramId}\`\n*Action:* ${isExtension ? 'Extension' : 'New Subscription'}\n*Expiry Date:* ${newExpiry.toDateString()}\n*Payment ID:* \`${paymentLink.id}\``;
+            await bot.telegram.sendMessage(configLib.ADMIN_CHAT_ID, adminMsg, { parse_mode: 'Markdown' }).catch(e => console.error("Admin notification failed:", e));
+          }
 
         } catch (botError) {
           console.error("Failed to generate or send invite link:", botError);
