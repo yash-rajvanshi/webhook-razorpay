@@ -45,12 +45,6 @@ const handler = async (req, res) => {
         const telegramId = notes.telegram_id;
 
         try {
-          // Generate a single-use invite link valid for 24 hours
-          const inviteLink = await bot.telegram.createChatInviteLink(configLib.TELEGRAM_CHANNEL_ID, {
-            member_limit: 1, 
-            expire_date: Math.floor(Date.now() / 1000) + (60 * 60 * 24),
-          });
-
           const db = await getDb();
           const usersColl = db.collection('users');
           const now = new Date();
@@ -86,14 +80,21 @@ const handler = async (req, res) => {
             { upsert: true }
           );
 
-          let successMessage = `🎉 Payment Successful!✅ Thanks for subscribing.\n\n📅 Your 30-day Premium subscription is now active and expires on ${newExpiry.toDateString()}.`;
-          if (isExtension) {
-            successMessage = `🎉 Payment Successful!✅ Your subscription has been extended by 30 days and is now valid until ${newExpiry.toDateString()}.`;
-          }
-          
-          successMessage += `\n\nHere is your single-use invite link to the Premium Channel:\n\n${inviteLink.invite_link}\n\nPlease join within 24 hours.`;
+          let successMessage;
 
-          await bot.telegram.sendMessage(telegramId, successMessage);
+          if (isExtension) {
+            // User is already in the channel — just confirm the extension, no new link needed
+            successMessage = `🎉 Payment Successful! ✅\n\nYour subscription has been extended by 30 days and is now valid until *${newExpiry.toDateString()}*.\n\nYou are already in the Premium Channel — no action needed! Enjoy your continued access. 🙌`;
+            await bot.telegram.sendMessage(telegramId, successMessage, { parse_mode: 'Markdown' });
+          } else {
+            // New user or expired — generate a fresh single-use invite link
+            const inviteLink = await bot.telegram.createChatInviteLink(configLib.TELEGRAM_CHANNEL_ID, {
+              member_limit: 1,
+              expire_date: Math.floor(Date.now() / 1000) + (60 * 60 * 24),
+            });
+            successMessage = `🎉 Payment Successful! ✅ Thanks for subscribing.\n\n📅 Your 30-day Premium subscription is now active and expires on *${newExpiry.toDateString()}*.\n\nHere is your single-use invite link to the Premium Channel:\n\n${inviteLink.invite_link}\n\nPlease join within 24 hours.`;
+            await bot.telegram.sendMessage(telegramId, successMessage, { parse_mode: 'Markdown' });
+          }
 
           if (configLib.ADMIN_CHAT_ID) {
             const adminMsg = `🤑 *New Subscription Payment!*\n\n*Name:* ${notes.first_name || 'N/A'}\n*Username:* @${notes.username || 'N/A'}\n*Telegram ID:* \`${telegramId}\`\n*Action:* ${isExtension ? 'Extension' : 'New Subscription'}\n*Expiry Date:* ${newExpiry.toDateString()}\n*Payment ID:* \`${paymentLink.id}\``;
