@@ -76,15 +76,22 @@ bot.command('status', async (ctx) => {
     const user = await usersColl.findOne({ telegram_id: telegramId });
 
     if (!user || !user.expiresAt) {
-      return ctx.reply("❌ You do not have an active subscription.\n\nUse /buy to get Premium access!");
+      return ctx.reply("❌ You do not have an active subscription.\n\nUse /buy to get Premium access!", {
+        reply_markup: { inline_keyboard: [[{ text: "🛒 Buy Subscription (₹99 / 30 days)", callback_data: "buy_premium" }]] }
+      });
     }
 
     const now = new Date();
     if (user.expiresAt < now) {
-      return ctx.reply(`⚠️ Your Premium subscription expired on ${user.expiresAt.toDateString()}.\n\nUse /buy to renew your access!`);
+      return ctx.reply(`⚠️ Your Premium subscription expired on ${user.expiresAt.toDateString()}.\n\nUse /buy to renew your access!`, {
+        reply_markup: { inline_keyboard: [[{ text: "🔄 Renew Subscription (₹99 / 30 days)", callback_data: "buy_premium" }]] }
+      });
     }
 
-    return ctx.reply(`✅ *Subscription Active*\n\nYour Premium access is valid until:\n📅 ${user.expiresAt.toDateString()}`, { parse_mode: 'Markdown' });
+    return ctx.reply(`✅ *Subscription Active*\n\nYour Premium access is valid until:\n📅 ${user.expiresAt.toDateString()}`, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: [[{ text: "⏩ Extend Subscription + 30 days", callback_data: "buy_premium" }]] }
+    });
   } catch (err) {
     console.error("Status DB Error:", err);
     return ctx.reply("Sorry, we encountered an error while fetching your status. Please try again later.");
