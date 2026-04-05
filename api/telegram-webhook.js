@@ -13,6 +13,12 @@ bot.start(async (ctx) => {
       ]
     }
   });
+
+  // Notify Admin
+  if (config.ADMIN_CHAT_ID) {
+    const adminMsg = `🆕 *New User Started the Bot!*\n\n*Name:* ${ctx.from.first_name || 'N/A'}\n*Username:* @${ctx.from.username || 'N/A'}\n*Telegram ID:* \`${ctx.from.id}\``;
+    await bot.telegram.sendMessage(config.ADMIN_CHAT_ID, adminMsg, { parse_mode: 'Markdown' }).catch(e => console.error("Admin notification failed:", e));
+  }
 });
 
 bot.command('buy', async (ctx) => {
