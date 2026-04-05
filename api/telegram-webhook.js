@@ -92,8 +92,26 @@ bot.command('status', async (ctx) => {
 });
 
 bot.command('help', async (ctx) => {
-  const helpText = `*HMT Stock Alert Bot - Help Menu*\n\nHere are the commands you can use:\n\n/start - View community links and welcome message\n/buy - Purchase Premium Stock Alerts (₹99 for 30 days)\n/status - Check your active subscription expiry date\n/help - Show this manual\n\nEach subscription lasts 30 days from the date of payment. If you experience payment issues, please reach out in the Community Group!`;
-  return ctx.reply(helpText, { parse_mode: 'Markdown' });
+  const helpText = `*HMT Stock Alert Bot 🕐*\n\n` +
+    `*🆓 Free Channel* — Open to everyone!\n` +
+    `Join here: https://t.me/+qyxExKKw9oZhZmM1\n` +
+    `• Stock alerts from hmtwatches.in & hmtwatches.store\n` +
+    `• All watch models covered\n` +
+    `• Alerts may be delayed compared to Premium\n\n` +
+    `*⭐ Premium Channel* — ₹99 for 30 days\n` +
+    `• 🚀 *Instant alerts* the moment stock goes live\n` +
+    `• 🎯 Focused alerts for high-demand watches:\n` +
+    `   Kohinoor, Himalaya, Tareeq, Sangam & Vijay\n` +
+    `• ⚡ Get ahead of everyone — these sell out in minutes!\n` +
+    `• 💬 Priority support in the community group\n\n` +
+    `*📌 Commands*\n` +
+    `/start - Welcome message & community links\n` +
+    `/buy - Get the Premium payment link (₹99 / 30 days)\n` +
+    `/status - Check when your Premium expires\n` +
+    `/help - Show this guide\n\n` +
+    `Each subscription lasts *30 days* from the date of payment.\n` +
+    `Having trouble? Reach out in the community group! 😄`;
+  return ctx.reply(helpText, { parse_mode: 'Markdown', disable_web_page_preview: true });
 });
 
 module.exports = async (req, res) => {
