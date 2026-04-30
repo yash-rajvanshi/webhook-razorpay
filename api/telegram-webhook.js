@@ -98,6 +98,145 @@ bot.command('status', async (ctx) => {
   }
 });
 
+// ─── Admin Command: /addcoupon ───────────────────────────────────────────────
+bot.command('addcoupon', async (ctx) => {
+  // Guard: Admin only
+  if (ctx.from.id.toString() !== config.ADMIN_CHAT_ID.toString()) {
+    return ctx.reply('❌ This command is restricted to the admin.');
+  }
+
+  const args = ctx.message.text.split(' ').slice(1);
+  const couponCode = args[0];
+
+  if (!couponCode) {
+    return ctx.reply('⚠️ Usage: `/addcoupon YOUR-CODE`\n\nExample: `/addcoupon HMT-FREE-001`', { parse_mode: 'Markdown' });
+  }
+
+  try {
+    const { addCoupon } = require('./_lib/coupon');
+    const result = await addCoupon(couponCode);
+
+    if (!result.success) {
+      return ctx.reply(`❌ Coupon \`${couponCode.toUpperCase()}\` already exists.`, { parse_mode: 'Markdown' });
+    }
+
+    return ctx.reply(`✅ Coupon \`${couponCode.toUpperCase()}\` created successfully!\n\nShare it with a user — they can redeem it with:\n\`/redeem ${couponCode.toUpperCase()}\``, { parse_mode: 'Markdown' });
+  } catch (err) {
+    console.error('Add coupon error:', err);
+    return ctx.reply('Sorry, something went wrong while creating the coupon. Please try again later.');
+  }
+});
+
+// ─── Admin Command: /listcoupons ─────────────────────────────────────────────
+bot.command('listcoupons', async (ctx) => {
+  // Guard: Admin only
+  if (ctx.from.id.toString() !== config.ADMIN_CHAT_ID.toString()) {
+    return ctx.reply('❌ This command is restricted to the admin.');
+  }
+
+  try {
+    const { listCoupons } = require('./_lib/coupon');
+    const coupons = await listCoupons();
+
+    if (coupons.length === 0) {
+      return ctx.reply('📋 No coupons exist yet.\n\nCreate one with `/addcoupon YOUR-CODE`', { parse_mode: 'Markdown' });
+    }
+
+    let msg = '📋 *All Coupons:*\n\n';
+    coupons.forEach((c, i) => {
+      if (c.used) {
+        msg += `${i + 1}. \`${c.code}\` — ✅ Used by \`${c.redeemedBy}\` on ${new Date(c.redeemedAt).toDateString()}\n`;
+      } else {
+        msg += `${i + 1}. \`${c.code}\` — 🟢 Available\n`;
+      }
+    });
+
+    return ctx.reply(msg, { parse_mode: 'Markdown' });
+  } catch (err) {
+    console.error('List coupons error:', err);
+    return ctx.reply('Sorry, something went wrong while fetching coupons. Please try again later.');
+  }
+});
+
+// ─── User Command: /redeem ───────────────────────────────────────────────────
+bot.command('redeem', async (ctx) => {
+  const telegramId = ctx.from.id.toString();
+  const args = ctx.message.text.split(' ').slice(1);
+  const couponCode = args[0];
+
+  if (!couponCode) {
+    return ctx.reply('⚠️ Please provide a coupon code.\n\nUsage: `/redeem YOUR-COUPON-CODE`', { parse_mode: 'Markdown' });
+  }
+
+  try {
+    const { redeemCoupon } = require('./_lib/coupon');
+    const result = await redeemCoupon(couponCode, telegramId);
+
+    if (!result.success) {
+      if (result.reason === 'already_used') {
+        return ctx.reply('❌ This coupon code has already been used.');
+      }
+      return ctx.reply('❌ Invalid coupon code. Please check and try again.');
+    }
+
+    // Coupon is valid — extend subscription by 30 days
+    const db = await getDb();
+    const usersColl = db.collection('users');
+    const now = new Date();
+    const existingUser = await usersColl.findOne({ telegram_id: telegramId });
+
+    let newExpiry;
+    if (existingUser && existingUser.expiresAt && existingUser.expiresAt > now) {
+      // Active user — add 30 days to current expiry
+      newExpiry = new Date(existingUser.expiresAt.getTime() + (30 * 24 * 60 * 60 * 1000));
+    } else {
+      // New or expired user — start 30 days from now
+      newExpiry = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
+    }
+
+    await usersColl.updateOne(
+      { telegram_id: telegramId },
+      {
+        $set: {
+          telegram_id: telegramId,
+          username: ctx.from.username || "",
+          first_name: ctx.from.first_name || "",
+          status: "active",
+          expiresAt: newExpiry,
+          warningSent: false
+        }
+      },
+      { upsert: true }
+    );
+
+    // Send success message
+    let successMsg;
+    if (existingUser && existingUser.expiresAt && existingUser.expiresAt > now) {
+      successMsg = `🎉 *Coupon Redeemed Successfully!*\n\nYour subscription has been extended by 30 days.\n📅 New expiry: *${newExpiry.toDateString()}*\n\nYou're already in the Premium Channel — enjoy! 🙌`;
+    } else {
+      // New/expired user — generate invite link
+      const inviteLink = await bot.telegram.createChatInviteLink(config.TELEGRAM_CHANNEL_ID, {
+        member_limit: 1,
+        expire_date: Math.floor(Date.now() / 1000) + (60 * 60 * 24),
+      });
+      successMsg = `🎉 *Coupon Redeemed Successfully!*\n\n📅 Your 30-day Premium subscription is now active until *${newExpiry.toDateString()}*.\n\nHere is your invite link to the Premium Channel:\n${inviteLink.invite_link}\n\nPlease join within 24 hours.`;
+    }
+
+    await ctx.reply(successMsg, { parse_mode: 'Markdown' });
+
+    // Admin notification
+    if (config.ADMIN_CHAT_ID) {
+      const adminMsg = `🎟️ *Coupon Redeemed!*\n\n*Code:* \`${couponCode.toUpperCase()}\`\n*Name:* ${ctx.from.first_name || 'N/A'}\n*Username:* @${ctx.from.username || 'N/A'}\n*Telegram ID:* \`${telegramId}\`\n*New Expiry:* ${newExpiry.toDateString()}`;
+      await bot.telegram.sendMessage(config.ADMIN_CHAT_ID, adminMsg, { parse_mode: 'Markdown' })
+        .catch(e => console.error('Admin coupon notification failed:', e));
+    }
+
+  } catch (err) {
+    console.error('Coupon redeem error:', err);
+    return ctx.reply('Sorry, something went wrong while redeeming your coupon. Please try again later.');
+  }
+});
+
 bot.command('help', async (ctx) => {
   const helpText = `*HMT Stock Alert Bot 🕐*\n\n` +
     `*🆓 Free Channel* — Open to everyone!\n` +
@@ -115,6 +254,7 @@ bot.command('help', async (ctx) => {
     `/start - Welcome message & community links\n` +
     `/buy - Get the Premium payment link (₹99 / 30 days)\n` +
     `/status - Check when your Premium expires\n` +
+    `/redeem - Redeem a coupon code (e.g. /redeem HMT-FREE-001)\n` +
     `/help - Show this guide\n\n` +
     `Each subscription lasts *30 days* from the date of payment.\n` +
     `Having trouble? Reach out in the community group! 😄`;
@@ -160,6 +300,7 @@ module.exports = async (req, res) => {
           { command: 'start', description: 'Start the bot and see community links' },
           { command: 'buy', description: 'Buy Premium Stock Alerts' },
           { command: 'status', description: 'Check your subscription status' },
+          { command: 'redeem', description: 'Redeem a coupon code for 30 days' },
           { command: 'help', description: 'Show instructions and commands' }
         ]);
         await bot.telegram.setWebhook(webhookUrl);
