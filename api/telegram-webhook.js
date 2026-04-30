@@ -105,25 +105,44 @@ bot.command('addcoupon', async (ctx) => {
     return ctx.reply('❌ This command is restricted to the admin.');
   }
 
-  const args = ctx.message.text.split(' ').slice(1);
-  const couponCode = args[0];
+  const rawArgs = ctx.message.text.split(' ').slice(1).join(' ');
 
-  if (!couponCode) {
-    return ctx.reply('⚠️ Usage: `/addcoupon YOUR-CODE`\n\nExample: `/addcoupon HMT-FREE-001`', { parse_mode: 'Markdown' });
+  if (!rawArgs.trim()) {
+    return ctx.reply('⚠️ Usage: `/addcoupon CODE1,CODE2,CODE3`\n\nExamples:\n`/addcoupon HMT-FREE-001`\n`/addcoupon HMT-FREE-001,HMT-FREE-002,HMT-GIFT-2026`', { parse_mode: 'Markdown' });
+  }
+
+  // Split by commas, trim whitespace, filter empty strings
+  const codes = rawArgs.split(',').map(c => c.trim()).filter(c => c.length > 0);
+
+  if (codes.length === 0) {
+    return ctx.reply('⚠️ No valid coupon codes provided.');
   }
 
   try {
     const { addCoupon } = require('./_lib/coupon');
-    const result = await addCoupon(couponCode);
+    const result = await addCoupon(codes);
 
-    if (!result.success) {
-      return ctx.reply(`❌ Coupon \`${couponCode.toUpperCase()}\` already exists.`, { parse_mode: 'Markdown' });
+    let msg = '';
+
+    if (result.created.length > 0) {
+      msg += `✅ *Created ${result.created.length} coupon(s):*\n`;
+      result.created.forEach(c => { msg += `  • \`${c}\`\n`; });
     }
 
-    return ctx.reply(`✅ Coupon \`${couponCode.toUpperCase()}\` created successfully!\n\nShare it with a user — they can redeem it with:\n\`/redeem ${couponCode.toUpperCase()}\``, { parse_mode: 'Markdown' });
+    if (result.duplicates.length > 0) {
+      if (msg) msg += '\n';
+      msg += `⚠️ *${result.duplicates.length} already existed (skipped):*\n`;
+      result.duplicates.forEach(c => { msg += `  • \`${c}\`\n`; });
+    }
+
+    if (result.created.length === 1) {
+      msg += `\nShare with a user: \`/redeem ${result.created[0]}\``;
+    }
+
+    return ctx.reply(msg, { parse_mode: 'Markdown' });
   } catch (err) {
     console.error('Add coupon error:', err);
-    return ctx.reply('Sorry, something went wrong while creating the coupon. Please try again later.');
+    return ctx.reply('Sorry, something went wrong while creating the coupon(s). Please try again later.');
   }
 });
 

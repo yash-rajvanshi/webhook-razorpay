@@ -1,31 +1,40 @@
 const { getDb } = require('./db');
 
 /**
- * Adds a new coupon code to the database.
- * @param {string} code - The coupon code to add.
- * @returns {{ success: boolean, reason?: string }}
+ * Adds one or more coupon codes to the database.
+ * @param {string[]} codes - Array of coupon codes to add.
+ * @returns {{ created: string[], duplicates: string[] }}
  */
-async function addCoupon(code) {
+async function addCoupon(codes) {
   const db = await getDb();
   const couponsColl = db.collection('coupons');
 
-  const normalizedCode = code.toUpperCase().trim();
+  const created = [];
+  const duplicates = [];
 
-  // Check if coupon already exists
-  const existing = await couponsColl.findOne({ code: normalizedCode });
-  if (existing) {
-    return { success: false, reason: 'already_exists' };
+  for (const raw of codes) {
+    const normalizedCode = raw.toUpperCase().trim();
+    if (!normalizedCode) continue;
+
+    // Check if coupon already exists
+    const existing = await couponsColl.findOne({ code: normalizedCode });
+    if (existing) {
+      duplicates.push(normalizedCode);
+      continue;
+    }
+
+    await couponsColl.insertOne({
+      code: normalizedCode,
+      used: false,
+      createdAt: new Date(),
+      redeemedBy: null,
+      redeemedAt: null
+    });
+
+    created.push(normalizedCode);
   }
 
-  await couponsColl.insertOne({
-    code: normalizedCode,
-    used: false,
-    createdAt: new Date(),
-    redeemedBy: null,
-    redeemedAt: null
-  });
-
-  return { success: true };
+  return { created, duplicates };
 }
 
 /**
