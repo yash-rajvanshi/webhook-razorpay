@@ -88,4 +88,15 @@ async function listCoupons() {
   return await couponsColl.find({}).sort({ createdAt: -1 }).toArray();
 }
 
-module.exports = { addCoupon, redeemCoupon, listCoupons };
+/**
+ * Lists only unused (available) coupons.
+ * @returns {Array} Array of unused coupon documents.
+ */
+async function listUnusedCoupons() {
+  const db = await getDb();
+  const couponsColl = db.collection('coupons');
+
+  return await couponsColl.find({ used: false }).sort({ createdAt: -1 }).toArray();
+}
+
+module.exports = { addCoupon, redeemCoupon, listCoupons, listUnusedCoupons };

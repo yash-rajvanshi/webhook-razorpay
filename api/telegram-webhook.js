@@ -192,6 +192,34 @@ bot.command('listcoupons', async (ctx) => {
   }
 });
 
+// ─── Admin Command: /unusedcoupons ───────────────────────────────────────────
+bot.command('unusedcoupons', async (ctx) => {
+  // Guard: Admin only
+  if (ctx.from.id.toString() !== config.ADMIN_CHAT_ID.toString()) {
+    return ctx.reply('❌ This command is restricted to the admin.');
+  }
+
+  try {
+    const { listUnusedCoupons } = require('./_lib/coupon');
+    const coupons = await listUnusedCoupons();
+
+    if (coupons.length === 0) {
+      return ctx.reply('📋 No unused coupons available.\n\nCreate one with `/addcoupon YOUR-CODE`', { parse_mode: 'Markdown' });
+    }
+
+    let msg = `🟢 *Unused Coupons (${coupons.length}):*\n\n`;
+    coupons.forEach((c, i) => {
+      const daysLabel = `${c.days || 30}D`;
+      msg += `${i + 1}. \`${c.code}\` (${daysLabel})\n`;
+    });
+
+    return ctx.reply(msg, { parse_mode: 'Markdown' });
+  } catch (err) {
+    console.error('Unused coupons error:', err);
+    return ctx.reply('Sorry, something went wrong while fetching unused coupons. Please try again later.');
+  }
+});
+
 // ─── User Command: /redeem ───────────────────────────────────────────────────
 bot.command('redeem', async (ctx) => {
   const telegramId = ctx.from.id.toString();

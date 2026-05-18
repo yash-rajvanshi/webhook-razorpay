@@ -28,7 +28,7 @@ The system is deployed entirely on **Vercel Serverless Functions** mapped inside
     - The bot directly DMs the user notifying them of their success and providing their unique join link!
 
 6. **Coupon System (`/redeem`)**
-    - Users can redeem single-use coupon codes to get or extend their 30-day Premium subscription.
+    - Users can redeem single-use coupon codes to get or extend their Premium subscription by a custom number of days (set at coupon creation, defaults to 30).
     - Admins can manage these coupons directly via Telegram commands.
 
 ---
@@ -78,14 +78,20 @@ MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/your-db-nam
 
 ## 🎟️ Coupon System
 
-The bot includes a robust coupon system for manual subscription management or promotional offers.
+The bot includes a robust coupon system for manual subscription management or promotional offers. Each coupon can carry a custom duration (defaults to 30 days).
 
 ### User Commands
-- `/redeem <CODE>`: Redeems a coupon code for 30 days of Premium access.
+- `/redeem <CODE>`: Redeems a coupon code. The subscription is extended by the number of days set when the coupon was created.
 
 ### Admin Commands (Restricted to `ADMIN_CHAT_ID`)
-- `/addcoupon CODE1,CODE2...`: Adds one or more unique coupon codes to the database. Supports comma-separated bulk entry.
-- `/listcoupons`: Displays all coupons in the database, their status (Available/Used), and who redeemed them.
+- `/addcoupon CODE1,CODE2... [DAYS]`: Adds one or more unique coupon codes. Supports comma-separated bulk entry. Append an optional duration suffix (e.g. `15D`) to set custom days; defaults to 30 if omitted.
+  ```
+  /addcoupon HMT-FREE-001              → 30 days (default)
+  /addcoupon HMT-FREE-001 15D          → 15 days
+  /addcoupon CODE1,CODE2,CODE3 7D      → 7 days each
+  ```
+- `/listcoupons`: Displays all coupons in the database with their duration, status (Available/Used), and who redeemed them.
+- `/unusedcoupons`: Lists only unused (available) coupons with their duration.
 
 ## 🗄️ Database Structure
 
@@ -108,6 +114,7 @@ The bot includes a robust coupon system for manual subscription management or pr
 {
   "_id": "ObjectId(...)",
   "code": "HMT-FREE-99",
+  "days": 30,
   "used": false,
   "createdAt": "2024-04-05T00:00:00.000Z",
   "redeemedBy": null,
