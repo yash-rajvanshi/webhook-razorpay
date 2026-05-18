@@ -3,9 +3,10 @@ const { getDb } = require('./db');
 /**
  * Adds one or more coupon codes to the database.
  * @param {string[]} codes - Array of coupon codes to add.
+ * @param {number} [days=30] - Number of days the coupon extends a subscription.
  * @returns {{ created: string[], duplicates: string[] }}
  */
-async function addCoupon(codes) {
+async function addCoupon(codes, days = 30) {
   const db = await getDb();
   const couponsColl = db.collection('coupons');
 
@@ -25,6 +26,7 @@ async function addCoupon(codes) {
 
     await couponsColl.insertOne({
       code: normalizedCode,
+      days: days,
       used: false,
       createdAt: new Date(),
       redeemedBy: null,

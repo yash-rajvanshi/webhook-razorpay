@@ -24,8 +24,12 @@ The system is deployed entirely on **Vercel Serverless Functions** mapped inside
    - If the user is an active subscriber extending their subscription: appends an extra 30 days onto their *existing* expiration date.
 
 5. **Fulfillment (Invite Link generation)**
-   - The bot generates a single-use, 24-hour expiring Telegram invite link to the Premium Channel.
-   - The bot directly DMs the user notifying them of their success and providing their unique join link!
+    - The bot generates a single-use, 24-hour expiring Telegram invite link to the Premium Channel.
+    - The bot directly DMs the user notifying them of their success and providing their unique join link!
+
+6. **Coupon System (`/redeem`)**
+    - Users can redeem single-use coupon codes to get or extend their 30-day Premium subscription.
+    - Admins can manage these coupons directly via Telegram commands.
 
 ---
 
@@ -45,6 +49,7 @@ RAZORPAY_KEY_SECRET=your_razorpay_key_secret
 RAZORPAY_WEBHOOK_SECRET=your_razorpay_webhook_secret
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 TELEGRAM_CHANNEL_ID=your_telegram_channel_id
+ADMIN_CHAT_ID=your_telegram_id_for_admin_commands
 DOMAIN=https://your-vercel-project-name.vercel.app  # Optional: Fallbacks to system VERCEL_URL if empty
 MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/your-db-name
 ```
@@ -58,7 +63,7 @@ MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/your-db-nam
 2. **Bind Telegram to Vercel (Two-Step Process)**
    
    *Step A: Publish the Command Menu*
-   - Visit the following URL in your browser to push the `/start`, `/buy`, `/help`, and `/status` commands to the Telegram UI:
+   - Visit the following URL in your browser to push the `/start`, `/buy`, `/help`, `/status`, and `/redeem` commands to the Telegram UI:
    - `https://<YOUR-VERCEL-DOMAIN>.vercel.app/api/telegram-webhook?setWebhook=true`
    
    *Step B: Lock the Production Pointer (Crucial for Vercel)*
@@ -71,9 +76,20 @@ MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/your-db-nam
    - Set Secret: Matches `RAZORPAY_WEBHOOK_SECRET`
    - Set Active Event: `payment_link.paid`
 
+## 🎟️ Coupon System
+
+The bot includes a robust coupon system for manual subscription management or promotional offers.
+
+### User Commands
+- `/redeem <CODE>`: Redeems a coupon code for 30 days of Premium access.
+
+### Admin Commands (Restricted to `ADMIN_CHAT_ID`)
+- `/addcoupon CODE1,CODE2...`: Adds one or more unique coupon codes to the database. Supports comma-separated bulk entry.
+- `/listcoupons`: Displays all coupons in the database, their status (Available/Used), and who redeemed them.
+
 ## 🗄️ Database Structure
 
-Documents in your MongoDB `users` collection look like this:
+### `users` collection:
 ```json
 {
   "_id": "ObjectId(...)",
@@ -86,3 +102,16 @@ Documents in your MongoDB `users` collection look like this:
   "lastPaymentId": "plink_xyz123"
 }
 ```
+
+### `coupons` collection:
+```json
+{
+  "_id": "ObjectId(...)",
+  "code": "HMT-FREE-99",
+  "used": false,
+  "createdAt": "2024-04-05T00:00:00.000Z",
+  "redeemedBy": null,
+  "redeemedAt": null
+}
+```
+

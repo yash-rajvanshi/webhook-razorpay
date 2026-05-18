@@ -105,14 +105,28 @@ bot.command('addcoupon', async (ctx) => {
     return ctx.reply('❌ This command is restricted to the admin.');
   }
 
-  const rawArgs = ctx.message.text.split(' ').slice(1).join(' ');
+  const parts = ctx.message.text.split(' ').slice(1);
 
-  if (!rawArgs.trim()) {
-    return ctx.reply('⚠️ Usage: `/addcoupon CODE1,CODE2,CODE3`\n\nExamples:\n`/addcoupon HMT-FREE-001`\n`/addcoupon HMT-FREE-001,HMT-FREE-002,HMT-GIFT-2026`', { parse_mode: 'Markdown' });
+  if (parts.length === 0 || !parts[0].trim()) {
+    return ctx.reply('⚠️ Usage: `/addcoupon CODE1,CODE2,CODE3 [DAYS]`\n\nExamples:\n`/addcoupon HMT-FREE-001` _(30 days default)_\n`/addcoupon HMT-FREE-001 15D` _(15 days)_\n`/addcoupon HMT-FREE-001,HMT-FREE-002 7D`', { parse_mode: 'Markdown' });
+  }
+
+  // Check if the last argument is a duration like 15D, 7D, 90D etc.
+  let days = 30;
+  let codesPart = parts.join(' ');
+  const lastArg = parts[parts.length - 1].toUpperCase();
+  const durationMatch = lastArg.match(/^(\d+)D$/);
+  if (durationMatch && parts.length > 1) {
+    days = parseInt(durationMatch[1], 10);
+    if (days < 1 || days > 365) {
+      return ctx.reply('⚠️ Duration must be between 1D and 365D.');
+    }
+    // Remove the duration part from the codes string
+    codesPart = parts.slice(0, -1).join(' ');
   }
 
   // Split by commas, trim whitespace, filter empty strings
-  const codes = rawArgs.split(',').map(c => c.trim()).filter(c => c.length > 0);
+  const codes = codesPart.split(',').map(c => c.trim()).filter(c => c.length > 0);
 
   if (codes.length === 0) {
     return ctx.reply('⚠️ No valid coupon codes provided.');
@@ -120,12 +134,12 @@ bot.command('addcoupon', async (ctx) => {
 
   try {
     const { addCoupon } = require('./_lib/coupon');
-    const result = await addCoupon(codes);
+    const result = await addCoupon(codes, days);
 
     let msg = '';
 
     if (result.created.length > 0) {
-      msg += `✅ *Created ${result.created.length} coupon(s):*\n`;
+      msg += `✅ *Created ${result.created.length} coupon(s) — ${days} day(s) each:*\n`;
       result.created.forEach(c => { msg += `  • \`${c}\`\n`; });
     }
 
@@ -163,10 +177,11 @@ bot.command('listcoupons', async (ctx) => {
 
     let msg = '📋 *All Coupons:*\n\n';
     coupons.forEach((c, i) => {
+      const daysLabel = `${c.days || 30}D`;
       if (c.used) {
-        msg += `${i + 1}. \`${c.code}\` — ✅ Used by \`${c.redeemedBy}\` on ${new Date(c.redeemedAt).toDateString()}\n`;
+        msg += `${i + 1}. \`${c.code}\` (${daysLabel}) — ✅ Used by \`${c.redeemedBy}\` on ${new Date(c.redeemedAt).toDateString()}\n`;
       } else {
-        msg += `${i + 1}. \`${c.code}\` — 🟢 Available\n`;
+        msg += `${i + 1}. \`${c.code}\` (${daysLabel}) — 🟢 Available\n`;
       }
     });
 
@@ -198,7 +213,8 @@ bot.command('redeem', async (ctx) => {
       return ctx.reply('❌ Invalid coupon code. Please check and try again.');
     }
 
-    // Coupon is valid — extend subscription by 30 days
+    // Coupon is valid — extend subscription by the coupon's day count
+    const couponDays = result.coupon.days || 30;
     const db = await getDb();
     const usersColl = db.collection('users');
     const now = new Date();
@@ -206,11 +222,11 @@ bot.command('redeem', async (ctx) => {
 
     let newExpiry;
     if (existingUser && existingUser.expiresAt && existingUser.expiresAt > now) {
-      // Active user — add 30 days to current expiry
-      newExpiry = new Date(existingUser.expiresAt.getTime() + (30 * 24 * 60 * 60 * 1000));
+      // Active user — add coupon days to current expiry
+      newExpiry = new Date(existingUser.expiresAt.getTime() + (couponDays * 24 * 60 * 60 * 1000));
     } else {
-      // New or expired user — start 30 days from now
-      newExpiry = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000));
+      // New or expired user — start coupon days from now
+      newExpiry = new Date(now.getTime() + (couponDays * 24 * 60 * 60 * 1000));
     }
 
     await usersColl.updateOne(
@@ -231,21 +247,21 @@ bot.command('redeem', async (ctx) => {
     // Send success message
     let successMsg;
     if (existingUser && existingUser.expiresAt && existingUser.expiresAt > now) {
-      successMsg = `🎉 *Coupon Redeemed Successfully!*\n\nYour subscription has been extended by 30 days.\n📅 New expiry: *${newExpiry.toDateString()}*\n\nYou're already in the Premium Channel — enjoy! 🙌`;
+      successMsg = `🎉 *Coupon Redeemed Successfully!*\n\nYour subscription has been extended by ${couponDays} day(s).\n📅 New expiry: *${newExpiry.toDateString()}*\n\nYou're already in the Premium Channel — enjoy! 🙌`;
     } else {
       // New/expired user — generate invite link
       const inviteLink = await bot.telegram.createChatInviteLink(config.TELEGRAM_CHANNEL_ID, {
         member_limit: 1,
         expire_date: Math.floor(Date.now() / 1000) + (60 * 60 * 24),
       });
-      successMsg = `🎉 *Coupon Redeemed Successfully!*\n\n📅 Your 30-day Premium subscription is now active until *${newExpiry.toDateString()}*.\n\nHere is your invite link to the Premium Channel:\n${inviteLink.invite_link}\n\nPlease join within 24 hours.`;
+      successMsg = `🎉 *Coupon Redeemed Successfully!*\n\n📅 Your ${couponDays}-day Premium subscription is now active until *${newExpiry.toDateString()}*.\n\nHere is your invite link to the Premium Channel:\n${inviteLink.invite_link}\n\nPlease join within 24 hours.`;
     }
 
     await ctx.reply(successMsg, { parse_mode: 'Markdown' });
 
     // Admin notification
     if (config.ADMIN_CHAT_ID) {
-      const adminMsg = `🎟️ *Coupon Redeemed!*\n\n*Code:* \`${couponCode.toUpperCase()}\`\n*Name:* ${ctx.from.first_name || 'N/A'}\n*Username:* @${ctx.from.username || 'N/A'}\n*Telegram ID:* \`${telegramId}\`\n*New Expiry:* ${newExpiry.toDateString()}`;
+      const adminMsg = `🎟️ *Coupon Redeemed!*\n\n*Code:* \`${couponCode.toUpperCase()}\`\n*Days:* ${couponDays}\n*Name:* ${ctx.from.first_name || 'N/A'}\n*Username:* @${ctx.from.username || 'N/A'}\n*Telegram ID:* \`${telegramId}\`\n*New Expiry:* ${newExpiry.toDateString()}`;
       await bot.telegram.sendMessage(config.ADMIN_CHAT_ID, adminMsg, { parse_mode: 'Markdown' })
         .catch(e => console.error('Admin coupon notification failed:', e));
     }
