@@ -407,8 +407,12 @@ bot.command('search', async (ctx) => {
   const limited = results.slice(0, 15);
   const hasMore = results.length > 15;
 
-  // 1 button per row for readability
-  const keyboard = limited.map(w => ([{ text: w.name, callback_data: `watch_${w.id}` }]));
+  // 2 buttons per row
+  const buttons = limited.map(w => ({ text: w.name, callback_data: `watch_${w.id}` }));
+  const keyboard = [];
+  for (let i = 0; i < buttons.length; i += 2) {
+    keyboard.push(buttons.slice(i, i + 2));
+  }
 
   let msg = `🔍 Found *${results.length}* watch${results.length !== 1 ? 'es' : ''} for *"${query}"*:`;
   if (hasMore) {
