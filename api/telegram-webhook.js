@@ -31,6 +31,12 @@ bot.command('buy', async (ctx) => {
       ]
     }
   });
+
+  // Notify Admin (Skip if the Admin themselves is testing the bot)
+  if (config.ADMIN_CHAT_ID && ctx.from.id.toString() !== config.ADMIN_CHAT_ID.toString()) {
+    const adminMsg = `🛒 *User Triggered /buy*\n\n*Name:* ${ctx.from.first_name || 'N/A'}\n*Username:* @${ctx.from.username || 'N/A'}\n*Telegram ID:* \`${ctx.from.id}\``;
+    await bot.telegram.sendMessage(config.ADMIN_CHAT_ID, adminMsg, { parse_mode: 'Markdown' }).catch(e => console.error("Admin notification failed:", e));
+  }
 });
 
 bot.action('buy_premium', async (ctx) => {
@@ -321,7 +327,8 @@ bot.command('help', async (ctx) => {
     `/help - Show this guide\n\n` +
     `Each subscription lasts *30 days* from the date of payment.\n` +
     `Having trouble? Reach out in the community group! 😄`;
-  return ctx.reply(helpText, {
+
+  await ctx.reply(helpText, {
     parse_mode: 'Markdown',
     disable_web_page_preview: true,
     reply_markup: {
@@ -330,6 +337,12 @@ bot.command('help', async (ctx) => {
       ]
     }
   });
+
+  // Notify Admin (Skip if the Admin themselves is testing the bot)
+  if (config.ADMIN_CHAT_ID && ctx.from.id.toString() !== config.ADMIN_CHAT_ID.toString()) {
+    const adminMsg = `❓ *User Triggered /help*\n\n*Name:* ${ctx.from.first_name || 'N/A'}\n*Username:* @${ctx.from.username || 'N/A'}\n*Telegram ID:* \`${ctx.from.id}\``;
+    await bot.telegram.sendMessage(config.ADMIN_CHAT_ID, adminMsg, { parse_mode: 'Markdown' }).catch(e => console.error("Admin notification failed:", e));
+  }
 });
 
 module.exports = async (req, res) => {
