@@ -8,11 +8,13 @@ The system is deployed entirely on **Vercel Serverless Functions** mapped inside
 
 1. **User Initiation (`/start`)**
    - The Telegram bot replies with community links and an initial pitch to buy the Premium subscription (for high-demand watches like Kohinoor, Himalaya, etc.) for ₹99.
+   - Admin is notified with the user's name, username, and Telegram ID.
 
 2. **Triggering Payment (`/buy` or Button Click)**
    - The Vercel function (`api/telegram-webhook.js`) communicates with Razorpay API.
    - It dynamically creates a Razorpay Payment Link carrying the user's `telegram_id`, `username`, and `first_name` securely inside the Razorpay `notes` payload.
    - The Bot responds to the user with the short URL.
+   - Admin is notified whenever a user triggers `/buy`.
 
 3. **Payment Processing (Razorpay Webhook)**
    - Once the user successfully pays, Razorpay fires a `payment_link.paid` webhook event to the server (`api/razorpay-webhook.js`).
@@ -30,6 +32,14 @@ The system is deployed entirely on **Vercel Serverless Functions** mapped inside
 6. **Coupon System (`/redeem`)**
     - Users can redeem single-use coupon codes to get or extend their Premium subscription by a custom number of days (set at coupon creation, defaults to 30).
     - Admins can manage these coupons directly via Telegram commands.
+    - Admin is notified whenever a coupon is redeemed, including the code, days granted, and new expiry date.
+
+7. **Watch Catalog Search (`/search`)**
+    - Users can search the full HMT watch catalog (721 watches) by name directly in the bot.
+    - Results appear as tappable inline buttons (up to 15 matches). Tapping a watch sends its photo with the name as caption.
+    - Search uses multi-term, case-insensitive regex (AND logic): e.g. `/search himalaya blue` matches only blue Himalaya variants.
+    - A 1-second per-user debounce prevents rapid-fire spam.
+    - Admin is notified with the search query and result count whenever a user triggers `/search`.
 
 ---
 
@@ -38,6 +48,7 @@ The system is deployed entirely on **Vercel Serverless Functions** mapped inside
 - **Database:** MongoDB Atlas + native Node.js MongoDB driver (connection cached to prevent cold-start exhaustion)
 - **Bot Framework:** `telegraf`
 - **Payment Gateway:** Razorpay Node.js SDK
+- **Watch Data:** `merged_watches.json` — 721 HMT watches, loaded once at cold start
 
 ## ⚙️ Environment Configuration
 
@@ -57,15 +68,15 @@ MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/your-db-nam
 ## 🚀 Deployment & Webhook Registration
 
 1. **Deploy to Vercel**
-   - Push your code to a GitHub repository and link it to Vercel. 
+   - Push your code to a GitHub repository and link it to Vercel.
    - Ensure the Environment Variables are correctly set inside the Vercel Dashboard.
 
 2. **Bind Telegram to Vercel (Two-Step Process)**
-   
+
    *Step A: Publish the Command Menu*
-   - Visit the following URL in your browser to push the `/start`, `/buy`, `/help`, `/status`, and `/redeem` commands to the Telegram UI:
+   - Visit the following URL in your browser to push the `/start`, `/buy`, `/status`, `/redeem`, `/search`, and `/help` commands to the Telegram UI:
    - `https://<YOUR-VERCEL-DOMAIN>.vercel.app/api/telegram-webhook?setWebhook=true`
-   
+
    *Step B: Lock the Production Pointer (Crucial for Vercel)*
    - To prevent Vercel's "Preview Environments" from causing 401 Unauthorized errors by locking out Telegram, you **must** manually force the webhook back to your clean production URL. Visit this in your browser:
    - `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=https://<YOUR-VERCEL-DOMAIN>.vercel.app/api/telegram-webhook`
@@ -75,6 +86,23 @@ MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/your-db-nam
    - Set URL: `https://<YOUR-VERCEL-DOMAIN>.vercel.app/api/razorpay-webhook`
    - Set Secret: Matches `RAZORPAY_WEBHOOK_SECRET`
    - Set Active Event: `payment_link.paid`
+
+## 🔍 Watch Catalog Search
+
+The bot includes a built-in search over the full HMT catalog (`merged_watches.json`, 721 watches).
+
+### How it works
+- **`/search`** (no arguments) — shows a usage prompt with examples.
+- **`/search <query>`** — runs a case-insensitive, multi-term regex search (AND logic). All words in the query must appear in the watch name.
+- Results appear as inline keyboard buttons (1 per row, up to 15). Tapping any sends the watch's photo with its full name as caption.
+- A **1-second debounce** per user prevents spam.
+
+### Examples
+```
+/search Kohinoor          → all Kohinoor variants
+/search Himalaya Blue     → only blue Himalaya variants
+/search XGSL 01           → all XGSL 01 models
+```
 
 ## 🎟️ Coupon System
 
@@ -92,6 +120,20 @@ The bot includes a robust coupon system for manual subscription management or pr
   ```
 - `/listcoupons`: Displays all coupons in the database with their duration, status (Available/Used), and who redeemed them.
 - `/unusedcoupons`: Lists only unused (available) coupons with their duration.
+
+## 🔔 Admin Notifications
+
+The admin (`ADMIN_CHAT_ID`) receives a Telegram message whenever a non-admin user triggers any of the following actions:
+
+| Event | Emoji | Info Sent |
+|---|---|---|
+| `/start` | 🆕 | Name, username, Telegram ID |
+| `/buy` | 🛒 | Name, username, Telegram ID |
+| `/help` | ❓ | Name, username, Telegram ID |
+| `/search` | 🔍 | Query, result count, name, username, Telegram ID |
+| Coupon redeemed | 🎟️ | Code, days, name, username, Telegram ID, new expiry |
+
+> Admin notifications are always skipped when the admin is using the bot themselves.
 
 ## 🗄️ Database Structure
 
@@ -121,4 +163,3 @@ The bot includes a robust coupon system for manual subscription management or pr
   "redeemedAt": null
 }
 ```
-

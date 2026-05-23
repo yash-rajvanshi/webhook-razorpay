@@ -22,6 +22,40 @@ function searchWatches(query) {
 const searchCooldowns = new Map();
 const SEARCH_COOLDOWN_MS = 1000;
 
+// Items shown per page (14 watch buttons + optional nav row = max 15 rows)
+const PAGE_SIZE = 14;
+
+/**
+ * Builds the message text and inline keyboard for a given page of search results.
+ * Nav row: [<<< PREV]  [NEXT >>>] shown only when applicable, in a single row.
+ * callback_data format for pagination: "sp:<page>:<query>" (max 64 bytes total).
+ */
+function buildSearchPage(results, query, page) {
+  const totalPages = Math.ceil(results.length / PAGE_SIZE);
+  const pageResults = results.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  // One watch button per row
+  const keyboard = pageResults.map(w => ([{ text: w.name, callback_data: `watch_${w.id}` }]));
+
+  // Navigation row (only shown when there are multiple pages)
+  if (totalPages > 1) {
+    const navRow = [];
+    if (page > 0) {
+      navRow.push({ text: '<<< PREV', callback_data: `sp:${page - 1}:${query}` });
+    }
+    if (page < totalPages - 1) {
+      navRow.push({ text: 'NEXT >>>', callback_data: `sp:${page + 1}:${query}` });
+    }
+    if (navRow.length > 0) keyboard.push(navRow);
+  }
+
+  const pageLabel = totalPages > 1 ? ` — page ${page + 1}/${totalPages}` : '';
+  const msg =
+    `🔍 Found *${results.length}* watch${results.length !== 1 ? 'es' : ''} for *"${query}"*${pageLabel}:`;
+
+  return { msg, keyboard };
+}
+
 bot.start(async (ctx) => {
   const welcomeText = `⭐ If you want to get stock alerts for highly demanding watches i.e. "Kohinoor", "Himalaya", "Tareeq", "Sangam", and "Vijay", buy our Premium subscription at just ₹99 for 30 days!\n\n🔔Free Stock alerts are posted in this Channel:\nhttps://t.me/+qyxExKKw9oZhZmM1\nThis is the broadcasting channel where we share stock updates from hmtwatches.in and hmtwatches.store.\n\n💬 Want to chat with other HMT fans?\nJoin our community group:\nhttps://t.me/+n18fg9lCz344NjJl\n\nIt's our HMT Enjoyers Group where we discuss watches, share purchases, and help each other out. 😄`;
 
@@ -403,18 +437,8 @@ bot.command('search', async (ctx) => {
     );
   }
 
-  // Cap at 15 results (Telegram button limit safety)
-  const limited = results.slice(0, 15);
-  const hasMore = results.length > 15;
-
-  // 1 button per row for readability
-  const keyboard = limited.map(w => ([{ text: w.name, callback_data: `watch_${w.id}` }]));
-
-  let msg = `🔍 Found *${results.length}* watch${results.length !== 1 ? 'es' : ''} for *"${query}"*:`;
-  if (hasMore) {
-    msg += `\n\n_Showing first 15. Try a more specific query to narrow down._`;
-  }
-
+  // Build page 0 and send
+  const { msg, keyboard } = buildSearchPage(results, query, 0);
   await ctx.reply(msg, {
     parse_mode: 'Markdown',
     reply_markup: { inline_keyboard: keyboard }
@@ -432,6 +456,26 @@ bot.command('search', async (ctx) => {
     await bot.telegram.sendMessage(config.ADMIN_CHAT_ID, adminMsg, { parse_mode: 'Markdown' })
       .catch(e => console.error('Admin notification failed:', e));
   }
+});
+
+// ─── Callback: Search Pagination (PREV / NEXT) ───────────────────────────────
+// callback_data format: "sp:<page>:<query>"  (max 64 bytes — safe for short queries)
+bot.action(/^sp:(\d+):(.+)$/, async (ctx) => {
+  const page = parseInt(ctx.match[1], 10);
+  const query = ctx.match[2];
+
+  await ctx.answerCbQuery();
+
+  const results = searchWatches(query);
+  if (results.length === 0) {
+    return ctx.editMessageText('❌ No results found for that query anymore.');
+  }
+
+  const { msg, keyboard } = buildSearchPage(results, query, page);
+  await ctx.editMessageText(msg, {
+    parse_mode: 'Markdown',
+    reply_markup: { inline_keyboard: keyboard }
+  });
 });
 
 // ─── Callback: Watch Photo Display ───────────────────────────────────────────
