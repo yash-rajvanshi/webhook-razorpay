@@ -526,7 +526,7 @@ module.exports = async (req, res) => {
           { command: 'start', description: 'Start the bot and see community links' },
           { command: 'buy', description: 'Buy Premium Stock Alerts' },
           { command: 'status', description: 'Check your subscription status' },
-          { command: 'redeem', description: 'Redeem a coupon code for 30 days' },
+          { command: 'redeem', description: 'Redeem a coupon code' },
           { command: 'search', description: 'Search the HMT watch catalog by name' },
           { command: 'help', description: 'Show instructions and commands' }
         ]);
