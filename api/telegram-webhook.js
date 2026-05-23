@@ -407,12 +407,8 @@ bot.command('search', async (ctx) => {
   const limited = results.slice(0, 15);
   const hasMore = results.length > 15;
 
-  // 2 buttons per row
-  const buttons = limited.map(w => ({ text: w.name, callback_data: `watch_${w.id}` }));
-  const keyboard = [];
-  for (let i = 0; i < buttons.length; i += 2) {
-    keyboard.push(buttons.slice(i, i + 2));
-  }
+  // 1 button per row for readability
+  const keyboard = limited.map(w => ([{ text: w.name, callback_data: `watch_${w.id}` }]));
 
   let msg = `🔍 Found *${results.length}* watch${results.length !== 1 ? 'es' : ''} for *"${query}"*:`;
   if (hasMore) {
@@ -459,10 +455,10 @@ module.exports = async (req, res) => {
   if (req.method === 'POST') {
     try {
       console.log('📬 INCOMING TELEGRAM WEBHOOK:', req.body);
-      
+
       // Process the Telegram update
       await bot.handleUpdate(req.body);
-      
+
       console.log('✅ WEBHOOK PROCESSED SUCCESSFULLY');
       // Let Vercel know request succeeded
       return res.status(200).send('OK');
@@ -480,7 +476,7 @@ module.exports = async (req, res) => {
         return res.status(400).send('DOMAIN is not set in env variables');
       }
       const webhookUrl = `${config.DOMAIN}/api/telegram-webhook`;
-      
+
       try {
         await bot.telegram.setMyCommands([
           { command: 'start', description: 'Start the bot and see community links' },
@@ -497,7 +493,7 @@ module.exports = async (req, res) => {
         return res.status(500).send("Error setting up webhook features.");
       }
     }
-    
+
     res.status(200).send('Telegram Bot Webhook Endpoint is active. Use ?setWebhook=true to configure.');
   }
 };
