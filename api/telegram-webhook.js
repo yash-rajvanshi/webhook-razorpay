@@ -2,6 +2,25 @@ const bot = require('./_lib/bot');
 const razorpay = require('./_lib/razorpay');
 const config = require('./_lib/config');
 const { getDb } = require('./_lib/db');
+const watches = require('../merged_watches.json'); // 721 HMT watches, loaded once at cold start
+
+// ─── Watch Search Helpers ────────────────────────────────────────────────────
+
+/**
+ * Returns watches whose name matches ALL search terms (case-insensitive).
+ * Each word in the query is a separate regex — AND logic.
+ * e.g. "himalaya blue" matches "HMT Himalaya AGGL 01 Blue" but not "HMT Himalaya AGGL 01 Yellow"
+ */
+function searchWatches(query) {
+  const terms = query.trim().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return [];
+  const regexes = terms.map(t => new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+  return watches.filter(w => regexes.every(re => re.test(w.name)));
+}
+
+// Per-user search cooldown map — 1-second debounce window (in-memory, per instance)
+const searchCooldowns = new Map();
+const SEARCH_COOLDOWN_MS = 1000;
 
 bot.start(async (ctx) => {
   const welcomeText = `⭐ If you want to get stock alerts for highly demanding watches i.e. "Kohinoor", "Himalaya", "Tareeq", "Sangam", and "Vijay", buy our Premium subscription at just ₹99 for 30 days!\n\n🔔Free Stock alerts are posted in this Channel:\nhttps://t.me/+qyxExKKw9oZhZmM1\nThis is the broadcasting channel where we share stock updates from hmtwatches.in and hmtwatches.store.\n\n💬 Want to chat with other HMT fans?\nJoin our community group:\nhttps://t.me/+n18fg9lCz344NjJl\n\nIt's our HMT Enjoyers Group where we discuss watches, share purchases, and help each other out. 😄`;
@@ -324,6 +343,7 @@ bot.command('help', async (ctx) => {
     `/buy - Get the Premium payment link (₹99 / 30 days)\n` +
     `/status - Check when your Premium expires\n` +
     `/redeem - Redeem a coupon code (e.g. /redeem HMT-FREE-001)\n` +
+    `/search - Search the HMT watch catalog by name\n` +
     `/help - Show this guide\n\n` +
     `Each subscription lasts *30 days* from the date of payment.\n` +
     `Having trouble? Reach out in the community group! 😄`;
@@ -343,6 +363,92 @@ bot.command('help', async (ctx) => {
     const adminMsg = `❓ *User Triggered /help*\n\n*Name:* ${ctx.from.first_name || 'N/A'}\n*Username:* @${ctx.from.username || 'N/A'}\n*Telegram ID:* \`${ctx.from.id}\``;
     await bot.telegram.sendMessage(config.ADMIN_CHAT_ID, adminMsg, { parse_mode: 'Markdown' }).catch(e => console.error("Admin notification failed:", e));
   }
+});
+
+// ─── User Command: /search ───────────────────────────────────────────────────
+bot.command('search', async (ctx) => {
+  const userId = ctx.from.id;
+
+  // ── Debounce: 1-second cooldown per user ──
+  const now = Date.now();
+  const lastSearch = searchCooldowns.get(userId);
+  if (lastSearch && (now - lastSearch) < SEARCH_COOLDOWN_MS) {
+    return ctx.reply('⏳ Please wait a moment before searching again.');
+  }
+  searchCooldowns.set(userId, now);
+
+  // ── Parse the search query from the message ──
+  const query = ctx.message.text.split(' ').slice(1).join(' ').trim();
+
+  if (!query) {
+    // No argument — show usage prompt
+    return ctx.reply(
+      '🔍 *Search the HMT Watch Catalog*\n\n' +
+      'Send your query after the command:\n' +
+      '`/search Kohinoor`\n' +
+      '`/search Himalaya Blue`\n' +
+      '`/search XGSL 01`\n\n' +
+      '_Tip: You can combine multiple words — all must match the watch name._',
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  // ── Run regex search ──
+  const results = searchWatches(query);
+
+  if (results.length === 0) {
+    return ctx.reply(
+      `❌ No watches found for *"${query}"*\n\nTry a different keyword like \`Kohinoor\`, \`Himalaya\`, or \`XGSL\`.`,
+      { parse_mode: 'Markdown' }
+    );
+  }
+
+  // Cap at 15 results (Telegram button limit safety)
+  const limited = results.slice(0, 15);
+  const hasMore = results.length > 15;
+
+  // 1 button per row for readability
+  const keyboard = limited.map(w => ([{ text: w.name, callback_data: `watch_${w.id}` }]));
+
+  let msg = `🔍 Found *${results.length}* watch${results.length !== 1 ? 'es' : ''} for *"${query}"*:`;
+  if (hasMore) {
+    msg += `\n\n_Showing first 15. Try a more specific query to narrow down._`;
+  }
+
+  await ctx.reply(msg, {
+    parse_mode: 'Markdown',
+    reply_markup: { inline_keyboard: keyboard }
+  });
+
+  // ── Admin notification (skip if admin is testing) ──
+  if (config.ADMIN_CHAT_ID && ctx.from.id.toString() !== config.ADMIN_CHAT_ID.toString()) {
+    const adminMsg =
+      `🔍 *User Triggered /search*\n\n` +
+      `*Query:* \`${query}\`\n` +
+      `*Results:* ${results.length}\n` +
+      `*Name:* ${ctx.from.first_name || 'N/A'}\n` +
+      `*Username:* @${ctx.from.username || 'N/A'}\n` +
+      `*Telegram ID:* \`${ctx.from.id}\``;
+    await bot.telegram.sendMessage(config.ADMIN_CHAT_ID, adminMsg, { parse_mode: 'Markdown' })
+      .catch(e => console.error('Admin notification failed:', e));
+  }
+});
+
+// ─── Callback: Watch Photo Display ───────────────────────────────────────────
+bot.action(/^watch_(\d+)$/, async (ctx) => {
+  const watchId = parseInt(ctx.match[1], 10);
+  const watch = watches.find(w => w.id === watchId);
+
+  await ctx.answerCbQuery();
+
+  if (!watch) {
+    return ctx.reply('❌ Watch not found. It may have been removed from the catalog.');
+  }
+
+  await ctx.replyWithPhoto(watch.url, {
+    caption: `🕐 *${watch.name}*`,
+    parse_mode: 'Markdown'
+  });
 });
 
 module.exports = async (req, res) => {
@@ -377,6 +483,7 @@ module.exports = async (req, res) => {
           { command: 'buy', description: 'Buy Premium Stock Alerts' },
           { command: 'status', description: 'Check your subscription status' },
           { command: 'redeem', description: 'Redeem a coupon code for 30 days' },
+          { command: 'search', description: 'Search the HMT watch catalog by name' },
           { command: 'help', description: 'Show instructions and commands' }
         ]);
         await bot.telegram.setWebhook(webhookUrl);
