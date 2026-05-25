@@ -2,6 +2,7 @@ const bot = require('./_lib/bot');
 const razorpay = require('./_lib/razorpay');
 const config = require('./_lib/config');
 const { getDb } = require('./_lib/db');
+const { rateLimit } = require('./_lib/rateLimiter');
 const watches = require('../merged_watches.json'); // 721 HMT watches, loaded once at cold start
 
 // ─── Watch Search Helpers ────────────────────────────────────────────────────
@@ -18,9 +19,7 @@ function searchWatches(query) {
   return watches.filter(w => regexes.every(re => re.test(w.name)));
 }
 
-// Per-user search cooldown map — 1-second debounce window (in-memory, per instance)
-const searchCooldowns = new Map();
-const SEARCH_COOLDOWN_MS = 1000;
+// Per-user rate limiting is handled globally by api/_lib/rateLimiter.js (2-second cooldown).
 
 // Items shown per page (14 watch buttons + optional nav row = max 15 rows)
 const PAGE_SIZE = 14;
@@ -57,12 +56,17 @@ function buildSearchPage(results, query, page) {
 }
 
 bot.start(async (ctx) => {
+  if (!rateLimit(ctx.from.id)) {
+    return ctx.reply('⏳ Please wait a moment before sending another command.');
+  }
+
   const welcomeText = `⭐ If you want to get stock alerts for highly demanding watches i.e. "Kohinoor", "Himalaya", "Tareeq", "Sangam", and "Vijay", buy our Premium subscription at just ₹99 for 30 days!\n\n🔔Free Stock alerts are posted in this Channel:\nhttps://t.me/+qyxExKKw9oZhZmM1\nThis is the broadcasting channel where we share stock updates from hmtwatches.in and hmtwatches.store.\n\n💬 Want to chat with other HMT fans?\nJoin our community group:\nhttps://t.me/+n18fg9lCz344NjJl\n\nIt's our HMT Enjoyers Group where we discuss watches, share purchases, and help each other out. 😄`;
 
   await ctx.reply(welcomeText, {
     reply_markup: {
       inline_keyboard: [
-        [{ text: "Buy Premium (₹99)", callback_data: "buy_premium" }]
+        [{ text: "Buy Premium (₹99)", callback_data: "buy_premium" }],
+        [{ text: "🎁 Try Free (3 days)", callback_data: "start_trial" }]
       ]
     }
   });
@@ -75,6 +79,10 @@ bot.start(async (ctx) => {
 });
 
 bot.command('buy', async (ctx) => {
+  if (!rateLimit(ctx.from.id)) {
+    return ctx.reply('⏳ Please wait a moment before sending another command.');
+  }
+
   const username = ctx.from.username || ctx.from.first_name || 'User';
 
   await ctx.reply(`Hello ${username}!\n\nClick the button below to join the HMT Stock Alert Pro Max channel for ₹99/month (30 days).`, {
@@ -128,6 +136,10 @@ bot.action('buy_premium', async (ctx) => {
 });
 
 bot.command('status', async (ctx) => {
+  if (!rateLimit(ctx.from.id)) {
+    return ctx.reply('⏳ Please wait a moment before sending another command.');
+  }
+
   const telegramId = ctx.from.id.toString();
   try {
     const db = await getDb();
@@ -281,6 +293,10 @@ bot.command('unusedcoupons', async (ctx) => {
 
 // ─── User Command: /redeem ───────────────────────────────────────────────────
 bot.command('redeem', async (ctx) => {
+  if (!rateLimit(ctx.from.id)) {
+    return ctx.reply('⏳ Please wait a moment before sending another command.');
+  }
+
   const telegramId = ctx.from.id.toString();
   const args = ctx.message.text.split(' ').slice(1);
   const couponCode = args[0];
@@ -360,6 +376,10 @@ bot.command('redeem', async (ctx) => {
 });
 
 bot.command('help', async (ctx) => {
+  if (!rateLimit(ctx.from.id)) {
+    return ctx.reply('⏳ Please wait a moment before sending another command.');
+  }
+
   const helpText = `*HMT Stock Alert Bot 🕐*\n\n` +
     `*🆓 Free Channel* — Open to everyone!\n` +
     `Join here: https://t.me/+qyxExKKw9oZhZmM1\n` +
@@ -375,6 +395,8 @@ bot.command('help', async (ctx) => {
     `*📌 Commands*\n` +
     `/start - Welcome message & community links\n` +
     `/buy - Get the Premium payment link (₹99 / 30 days)\n` +
+    `/trial - Start a free 3-day Premium trial (one-time)\n` +
+    `/price - See current Premium pricing\n` +
     `/status - Check when your Premium expires\n` +
     `/redeem - Redeem a coupon code (e.g. /redeem HMT-FREE-001)\n` +
     `/search - Search the HMT watch catalog by name\n` +
@@ -387,7 +409,8 @@ bot.command('help', async (ctx) => {
     disable_web_page_preview: true,
     reply_markup: {
       inline_keyboard: [
-        [{ text: "Buy Premium (₹99 / 30 days)", callback_data: "buy_premium" }]
+        [{ text: "Buy Premium (₹99 / 30 days)", callback_data: "buy_premium" }],
+        [{ text: "🎁 Try Free (3 days)", callback_data: "start_trial" }]
       ]
     }
   });
@@ -399,17 +422,147 @@ bot.command('help', async (ctx) => {
   }
 });
 
+// ─── User Command: /price ─────────────────────────────────────────────────────
+bot.command('price', async (ctx) => {
+  if (!rateLimit(ctx.from.id)) {
+    return ctx.reply('⏳ Please wait a moment before sending another command.');
+  }
+
+  const priceText =
+    `💰 *HMT Stock Alert Premium Pricing*\n\n` +
+    `📦 *Premium Plan*\n` +
+    `• Price: *₹99*\n` +
+    `• Duration: *30 days*\n` +
+    `• Instant stock alerts for Kohinoor, Himalaya, Tareeq, Sangam & Vijay\n` +
+    `• Alerts the moment stock goes live — before everyone else!\n\n` +
+    `🎁 *Free Trial*\n` +
+    `• Try Premium free for *3 days* with /trial\n` +
+    `• No payment required — one trial per user\n\n` +
+    `Ready to subscribe? Tap below! 👇`;
+
+  await ctx.reply(priceText, {
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "🛒 Buy Premium (₹99 / 30 days)", callback_data: "buy_premium" }],
+        [{ text: "🎁 Try Free (3 days)", callback_data: "start_trial" }]
+      ]
+    }
+  });
+});
+
+// ─── Trial Helper ─────────────────────────────────────────────────────────────
+/**
+ * Core logic for activating a free 3-day trial.
+ * Called by both the /trial command and the start_trial button callback.
+ * @param {import('telegraf').Context} ctx
+ */
+async function activateTrial(ctx) {
+  const telegramId = ctx.from.id.toString();
+
+  try {
+    const db = await getDb();
+    const usersColl = db.collection('users');
+    const existingUser = await usersColl.findOne({ telegram_id: telegramId });
+
+    // Guard 1: Already used trial
+    if (existingUser && existingUser.trialUsed) {
+      return ctx.reply(
+        '❌ You have already used your free trial.\n\nUse /buy to get Premium access!',
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🛒 Buy Premium (₹99 / 30 days)", callback_data: "buy_premium" }]
+            ]
+          }
+        }
+      );
+    }
+
+    // Guard 2: Already has an active paid subscription
+    const now = new Date();
+    if (existingUser && existingUser.expiresAt && existingUser.expiresAt > now) {
+      return ctx.reply(
+        `✅ You already have an active subscription until *${existingUser.expiresAt.toDateString()}*. No trial needed!`,
+        { parse_mode: 'Markdown' }
+      );
+    }
+
+    // Activate 3-day trial
+    const TRIAL_DAYS = 3;
+    const trialExpiry = new Date(now.getTime() + (TRIAL_DAYS * 24 * 60 * 60 * 1000));
+
+    await usersColl.updateOne(
+      { telegram_id: telegramId },
+      {
+        $set: {
+          telegram_id: telegramId,
+          username: ctx.from.username || "",
+          first_name: ctx.from.first_name || "",
+          status: "active",
+          expiresAt: trialExpiry,
+          trialUsed: true,
+          warningSent: false
+        }
+      },
+      { upsert: true }
+    );
+
+    // Generate single-use invite link (24hr expiry)
+    const inviteLink = await bot.telegram.createChatInviteLink(
+      config.TELEGRAM_CHANNEL_ID,
+      {
+        member_limit: 1,
+        expire_date: Math.floor(Date.now() / 1000) + (60 * 60 * 24),
+      }
+    );
+
+    const successMsg =
+      `🎁 *Free Trial Activated!*\n\n` +
+      `Your 3-day Premium trial is now active until *${trialExpiry.toDateString()}*.\n\n` +
+      `Here is your invite link to the Premium Channel:\n${inviteLink.invite_link}\n\n` +
+      `Please join within 24 hours.\n\n` +
+      `_Enjoying Premium? Use /buy to continue after your trial ends!_ 😊`;
+
+    await ctx.reply(successMsg, { parse_mode: 'Markdown' });
+
+    // Admin notification
+    if (config.ADMIN_CHAT_ID && ctx.from.id.toString() !== config.ADMIN_CHAT_ID.toString()) {
+      const adminMsg =
+        `🎁 *Free Trial Activated!*\n\n` +
+        `*Name:* ${ctx.from.first_name || 'N/A'}\n` +
+        `*Username:* @${ctx.from.username || 'N/A'}\n` +
+        `*Telegram ID:* \`${telegramId}\`\n` +
+        `*Trial Expiry:* ${trialExpiry.toDateString()}`;
+      await bot.telegram.sendMessage(config.ADMIN_CHAT_ID, adminMsg, { parse_mode: 'Markdown' })
+        .catch(e => console.error('Admin trial notification failed:', e));
+    }
+
+  } catch (err) {
+    console.error('Trial activation error:', err);
+    return ctx.reply('Sorry, something went wrong while activating your trial. Please try again later.');
+  }
+}
+
+// ─── User Command: /trial ─────────────────────────────────────────────────────
+bot.command('trial', async (ctx) => {
+  if (!rateLimit(ctx.from.id)) {
+    return ctx.reply('⏳ Please wait a moment before sending another command.');
+  }
+  return activateTrial(ctx);
+});
+
+// ─── Callback: Start Trial via Button ────────────────────────────────────────
+bot.action('start_trial', async (ctx) => {
+  await ctx.answerCbQuery();
+  return activateTrial(ctx);
+});
+
 // ─── User Command: /search ───────────────────────────────────────────────────
 bot.command('search', async (ctx) => {
-  const userId = ctx.from.id;
-
-  // ── Debounce: 1-second cooldown per user ──
-  const now = Date.now();
-  const lastSearch = searchCooldowns.get(userId);
-  if (lastSearch && (now - lastSearch) < SEARCH_COOLDOWN_MS) {
+  if (!rateLimit(ctx.from.id)) {
     return ctx.reply('⏳ Please wait a moment before searching again.');
   }
-  searchCooldowns.set(userId, now);
 
   // ── Parse the search query from the message ──
   const query = ctx.message.text.split(' ').slice(1).join(' ').trim();
@@ -506,8 +659,6 @@ module.exports = async (req, res) => {
       console.log('✅ WEBHOOK PROCESSED SUCCESSFULLY');
       // Let Vercel know request succeeded
       return res.status(200).send('OK');
-      // Let Vercel know request succeeded
-      return res.status(200).send('OK');
     } catch (e) {
       console.error(e);
       // It's recommended to return 200 to Telegram even on errors so they don't get stuck retrying the same bad webhook
@@ -524,7 +675,9 @@ module.exports = async (req, res) => {
       try {
         await bot.telegram.setMyCommands([
           { command: 'start', description: 'Start the bot and see community links' },
-          { command: 'buy', description: 'Buy Premium Stock Alerts' },
+          { command: 'buy', description: 'Buy Premium Stock Alerts (₹99 / 30 days)' },
+          { command: 'trial', description: 'Start a free 3-day Premium trial' },
+          { command: 'price', description: 'See current Premium pricing' },
           { command: 'status', description: 'Check your subscription status' },
           { command: 'redeem', description: 'Redeem a coupon code' },
           { command: 'search', description: 'Search the HMT watch catalog by name' },
