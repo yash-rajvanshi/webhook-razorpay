@@ -19,6 +19,40 @@ function searchWatches(query) {
   return watches.filter(w => regexes.every(re => re.test(w.name)));
 }
 
+// ─── Blocked Users ───────────────────────────────────────────────────────────
+// These Telegram user IDs are permanently blocked from using the bot.
+const BLOCKED_TELEGRAM_IDS = new Set([
+  '8736188482',
+  '6340390431',
+]);
+
+bot.use(async (ctx, next) => {
+  const userId = ctx.from?.id?.toString();
+  if (userId && BLOCKED_TELEGRAM_IDS.has(userId)) {
+    // Acknowledge callback queries so the button doesn't show a spinner forever
+    if (ctx.callbackQuery) {
+      await ctx.answerCbQuery().catch(() => {});
+    }
+    await ctx.reply('Bro you copied enough features, Build something of your own 😘').catch(() => {});
+
+    // Notify Admin about the blocked user's attempt
+    if (config.ADMIN_CHAT_ID) {
+      const attemptedAction = ctx.message?.text || ctx.callbackQuery?.data || 'Unknown action';
+      const adminMsg =
+        `🚫 *Blocked User Attempted Access*\n\n` +
+        `*Name:* ${ctx.from.first_name || 'N/A'}\n` +
+        `*Username:* @${ctx.from.username || 'N/A'}\n` +
+        `*Telegram ID:* \`${userId}\`\n` +
+        `*Tried:* \`${attemptedAction}\``;
+      await bot.telegram.sendMessage(config.ADMIN_CHAT_ID, adminMsg, { parse_mode: 'Markdown' })
+        .catch(e => console.error('Admin blocked-user notification failed:', e));
+    }
+
+    return; // Do NOT call next() — completely block further processing
+  }
+  return next();
+});
+
 // Per-user rate limiting is handled globally by api/_lib/rateLimiter.js (2-second cooldown).
 
 // Items shown per page (14 watch buttons + optional nav row = max 15 rows)
